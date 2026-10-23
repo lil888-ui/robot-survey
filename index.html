@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ロボットのすれ違い評価</title>
+<style>
+/* 縦1列のアンケート。動画を上、質問を下に置き、スマホで片手で答えられる幅に収める */
+:root{
+  --bg:#f4f6f8; --card:#ffffff; --fg:#14213a; --sub:#3c4a60; --line:#cdd5df;
+  --accent:#1d5a9e; --accent-fg:#ffffff; --soft:#e4ecf6; --warn:#8f3d0c;
+  --font:"Hiragino Sans","Noto Sans JP","Yu Gothic UI","Meiryo",system-ui,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root{ --bg:#10161f; --card:#18212d; --fg:#e8edf4; --sub:#b4bfcd; --line:#334155;
+    --accent:#6fa6e6; --accent-fg:#0d1520; --soft:#1f2c3d; --warn:#f0a36b; color-scheme:dark; }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:16px;line-height:1.7;
+  padding:16px max(16px,env(safe-area-inset-right,0px)) 48px max(16px,env(safe-area-inset-left,0px))}
+main{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+h1{font-size:1.35rem;line-height:1.4;margin:0}
+h2{font-size:1.05rem;margin:0}
+p{margin:0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:12px}
+.sub{color:var(--sub);font-size:.92rem}
+.def{background:var(--soft);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.def b{color:var(--accent)}
+.bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden}
+.bar>div{height:100%;background:var(--accent);width:0;transition:width .3s}
+.count{font-variant-numeric:tabular-nums;color:var(--sub);font-size:.9rem}
+video{width:100%;max-width:100%;aspect-ratio:864/480;background:#000;border-radius:8px;display:block}
+.note{font-size:.9rem;color:var(--warn)}
+fieldset{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+legend{font-weight:700;padding:0;margin-bottom:6px}
+.scale{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.scale label{display:flex;flex-direction:column;align-items:center;gap:2px;font-variant-numeric:tabular-nums;cursor:pointer;padding:6px 0;border-radius:6px}
+.ends{display:flex;justify-content:space-between;gap:8px;font-size:.82rem;color:var(--sub)}
+.opts{display:flex;flex-wrap:wrap;gap:8px}
+.opts label{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer}
+.opts label:has(input:checked),.scale label:has(input:checked){background:var(--soft);outline:2px solid var(--accent)}
+input[type=radio]{accent-color:var(--accent);width:18px;height:18px;margin:0}
+fieldset:disabled{opacity:.45}
+button{font:inherit;font-weight:700;border:0;border-radius:8px;padding:12px 20px;background:var(--accent);color:var(--accent-fg);cursor:pointer}
+button:disabled{opacity:.4;cursor:not-allowed}
+button:focus-visible,label:focus-within{outline:3px solid var(--accent);outline-offset:2px}
+.right{display:flex;justify-content:flex-end}
+hr{border:0;border-top:1px solid var(--line);margin:4px 0}
+</style>
+</head>
+<body>
+<main>
+
+<!-- 1. はじめに -->
+<section id="s-intro" class="card">
+  <h1>ロボットとすれ違う動画の評価</h1>
+  <p>移動ロボットが人とすれ違う短い動画を <b id="n-videos">12</b> 本見て、それぞれについて答えていただきます。所要時間は10分ほどです。</p>
+  <p>動画は動画生成AIで作ったもので、映っている人は実在しません。回答は匿名で記録し、研究以外には使いません。途中でやめても構いません(それまでの回答は記録されます)。</p>
+  <div class="def">
+    <p><b>図々しさ</b>:ロボットが、周りの人に遠慮せず、自分の都合で押し通した程度。</p>
+    <p><b>許容度</b>:その場にいたとしたら、ロボットのふるまいを受け入れられるか。</p>
+    <p class="sub">どちらも、映っている人の立場ではなく、<b>動画を見ているあなたがどう感じるか</b>で答えてください。</p>
+  </div>
+  <p class="sub">音は出ません。動画は何度でも見直せます。最後まで一度見ると、質問に答えられるようになります。</p>
+  <div class="right"><button id="b-intro" type="button">はじめる</button></div>
+</section>
+
+<!-- 2. 事前の質問 -->
+<section id="s-profile" class="card" hidden>
+  <h2>はじめに1つだけ教えてください</h2>
+  <fieldset id="f-exp">
+    <legend>ロボットに触れた経験</legend>
+    <div class="opts" id="o-exp"></div>
+  </fieldset>
+  <p class="note" id="e-assign" hidden></p>
+  <div class="right"><button id="b-profile" type="button" disabled>動画へ進む</button></div>
+</section>
+
+<!-- 3. 動画ごとの評価 -->
+<section id="s-video" class="card" hidden>
+  <div class="bar"><div id="bar"></div></div>
+  <p class="count" id="count"></p>
+  <video id="vid" muted playsinline controls preload="auto"></video>
+  <p class="note" id="watch-note">動画を最後まで見ると、下の質問に答えられます。</p>
+  <form id="qform" novalidate>
+    <fieldset id="qs" disabled></fieldset>
+  </form>
+  <div class="right"><button id="b-next" type="button" disabled>次へ</button></div>
+</section>
+
+<!-- 4. おわり -->
+<section id="s-done" class="card" hidden>
+  <h1>ご協力ありがとうございました</h1>
+  <p>回答はすべて記録されました。このページは閉じて構いません。</p>
+</section>
+
+</main>
+<script>
+/* ===== 設定(ここだけ書き換える) ===== */
+const CONFIG = {
+  // Apps Script を「ウェブアプリ」として公開したときの URL(末尾が /exec)
+  GAS_URL: "https://script.google.com/macros/s/AKfycbzGD6hfNxXHmov7Cr_g847lpfz7wYTc6bbKVza1RDg1W4rmLJROsdZmxlZaO5SwxN1j/exec",
+  PER_PERSON: 12,
+  // 条件ID → videos フォルダ内のファイル名(ファイル名から条件が分からないよう番号にしてある)
+  VIDEOS: {
+    "SQ-A-01":"v10.mp4","SQ-A-02":"v17.mp4","SQ-A-03":"v24.mp4","SQ-A-04":"v14.mp4",
+    "SQ-A-05":"v13.mp4","SQ-A-06":"v08.mp4","SQ-A-07":"v18.mp4","SQ-A-08":"v22.mp4",
+    "SQ-A-09":"v23.mp4","SQ-A-10":"v12.mp4","SQ-A-11":"v19.mp4","SQ-A-12":"v04.mp4",
+    "SQ-B-01":"v09.mp4","SQ-B-02":"v06.mp4","SQ-B-07":"v01.mp4","SQ-B-08":"v05.mp4",
+    "SQ-B-13":"v03.mp4","SQ-B-15":"v20.mp4",
+    "CN-A1B1":"v26.mp4","CN-A1B2":"v28.mp4","CN-A1B3":"v25.mp4",
+    "CN-A2B1":"v02.mp4","CN-A2B2":"v11.mp4","CN-A2B3":"v29.mp4",
+    "CN-A3B1":"v07.mp4","CN-A3B2":"v21.mp4","CN-A3B3":"v27.mp4",
+    "CN-A4B1":"v15.mp4","CN-A4B2":"v30.mp4","CN-A4B3":"v16.mp4"
+  }
+};
+
+/* ===== 質問の定義 ===== */
+const EXPERIENCE = ["ほとんどない","見かけたことはある","何度か触れたことがある","研究や仕事で日常的に扱っている"];
+// 質問の部品。label の番号は表示するときに振る
+const Q = {
+  brazen:     {key:"brazen", label:"図々しさ", type:"scale", left:"まったく図々しくない", right:"とても図々しい"},
+  accept:     {key:"accept", label:"許容度",   type:"scale", left:"まったく受け入れられない", right:"十分受け入れられる"},
+  walk:       {key:"walk",   label:"人の歩く速さ", type:"choice", opts:["ゆっくり","ふつう","速い"]},
+  light:      {key:"light",  label:"背景の明るさ", type:"choice", opts:["暗い","ふつう","明るい"]},
+  dist:       {key:"dist",   label:"ロボットとの距離(いちばん近づいたとき)", type:"choice",
+               opts:["大きく離れた","腕一本ほど","肩すれすれ","人と人の間を通り抜けた","進路上で止まった"]},
+  speed:      {key:"speed",  label:"ロボットの速さ", type:"choice", opts:["速さを保った","遅くなった","止まった"]},
+  onset:      {key:"onset",  label:"ロボットが避け始めたタイミング", type:"choice", opts:["早め","直前"]},
+  robot_act:  {key:"robot_act",  label:"ロボットの動き", type:"choice", opts:["そのまま進んだ","大回りした","減速した","一時停止した"]},
+  human_resp: {key:"human_resp", label:"人の反応", type:"choice", opts:["譲らずに進んだ","立ち止まった","よけた"]}
+};
+// 駅前広場(SQ)は距離・速度・避け始めを、曲がり角(CN)はロボットの動きと人の反応を確かめる
+function questionsFor(id){
+  return id.startsWith("CN-")
+    ? [Q.brazen, Q.accept, Q.walk, Q.robot_act, Q.light, Q.human_resp]
+    : [Q.brazen, Q.accept, Q.walk, Q.dist, Q.light, Q.speed, Q.onset];
+}
+let QUESTIONS = [];   // 今の動画の質問
+
+/* ===== 状態 ===== */
+const params = new URLSearchParams(location.search);
+const TEST = params.get("test") === "1";          // ?test=1 で開くと、試しの回答として記録
+const sid = (TEST ? "test-" : "") + (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2));
+let playlist = [];      // この人に出す条件IDの並び
+let idx = 0;            // 今何本目か
+let watched = false;    // 今の動画を最後まで見たか
+let experience = null;
+
+const $ = id => document.getElementById(id);
+function show(id){ for (const s of document.querySelectorAll("main>section")) s.hidden = (s.id !== id); window.scrollTo(0,0); }
+
+/* 回答を送る(ページは結果を待たない。送信に失敗しても回答は続けられる) */
+function send(payload){
+  if (!CONFIG.GAS_URL.startsWith("https://")) { console.warn("GAS_URL 未設定", payload); return; }
+  fetch(CONFIG.GAS_URL, {method:"POST", mode:"no-cors", keepalive:true,
+    headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify(payload)}).catch(()=>{});
+}
+
+/* 動画の割り当てを受け取る。失敗したら手元でランダムに選ぶ */
+async function getPlaylist(){
+  const all = Object.keys(CONFIG.VIDEOS);
+  try{
+    const url = `${CONFIG.GAS_URL}?action=assign&sid=${encodeURIComponent(sid)}&n=${CONFIG.PER_PERSON}`;
+    const res = await fetch(url, {cache:"no-store"});
+    const data = await res.json();
+    const ids = (data.ids || []).filter(id => id in CONFIG.VIDEOS);
+    if (ids.length === CONFIG.PER_PERSON) return {ids, source:"server"};
+  }catch(e){ /* 下でフォールバック */ }
+  return {ids: shuffle(all).slice(0, CONFIG.PER_PERSON), source:"fallback"};
+}
+function shuffle(a){ a = a.slice(); for (let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+
+/* ===== 画面1:はじめに ===== */
+$("n-videos").textContent = CONFIG.PER_PERSON;
+$("b-intro").addEventListener("click", () => show("s-profile"));
+
+/* ===== 画面2:経験 ===== */
+EXPERIENCE.forEach((t,i) => {
+  const l = document.createElement("label");
+  l.innerHTML = `<input type="radio" name="exp" id="exp-${i}" value="${t}"><span></span>`;
+  l.querySelector("span").textContent = t;
+  $("o-exp").appendChild(l);
+});
+$("o-exp").addEventListener("change", e => { experience = e.target.value; $("b-profile").disabled = false; });
+$("b-profile").addEventListener("click", async () => {
+  $("b-profile").disabled = true; $("b-profile").textContent = "準備しています…";
+  const {ids, source} = await getPlaylist();
+  playlist = ids;
+  send({type:"profile", sid, experience, source, width: window.innerWidth, ids: playlist.join(",")});
+  idx = 0; loadVideo(); show("s-video");
+});
+
+/* ===== 画面3:動画と質問 ===== */
+function buildQuestions(){
+  const qs = $("qs"); qs.innerHTML = "";
+  for (const q of QUESTIONS){
+    const f = document.createElement("fieldset");
+    const lg = document.createElement("legend"); lg.textContent = `${QUESTIONS.indexOf(q) + 1}. ${q.label}`; f.appendChild(lg);
+    if (q.type === "scale"){
+      const g = document.createElement("div"); g.className = "scale";
+      for (let v=1; v<=7; v++){
+        const l = document.createElement("label");
+        l.innerHTML = `<span>${v}</span><input type="radio" name="${q.key}" id="${q.key}-${v}" value="${v}">`;
+        g.appendChild(l);
+      }
+      const ends = document.createElement("div"); ends.className = "ends";
+      ends.innerHTML = "<span></span><span></span>";
+      ends.children[0].textContent = q.left; ends.children[1].textContent = q.right;
+      f.append(g, ends);
+    } else {
+      const g = document.createElement("div"); g.className = "opts";
+      q.opts.forEach((t,i) => {
+        const l = document.createElement("label");
+        l.innerHTML = `<input type="radio" name="${q.key}" id="${q.key}-${i}" value="${t}"><span></span>`;
+        l.querySelector("span").textContent = t;
+        g.appendChild(l);
+      });
+      f.appendChild(g);
+    }
+    qs.appendChild(f);
+    if (q.key === "accept") qs.appendChild(document.createElement("hr"));
+  }
+}
+function answers(){
+  const fd = new FormData($("qform")); const out = {};
+  for (const q of QUESTIONS) out[q.key] = fd.get(q.key);
+  return out;
+}
+function updateNext(){
+  const a = answers();
+  $("b-next").disabled = !(watched && QUESTIONS.every(q => a[q.key]));
+}
+function loadVideo(){
+  const id = playlist[idx];
+  watched = false;
+  QUESTIONS = questionsFor(id);
+  buildQuestions();
+  $("qs").disabled = true;
+  $("watch-note").hidden = false;
+  $("b-next").disabled = true;
+  $("b-next").textContent = (idx === playlist.length - 1) ? "回答を終える" : "次へ";
+  $("count").textContent = `${idx + 1} / ${playlist.length} 本目`;
+  $("bar").style.width = `${(idx / playlist.length) * 100}%`;
+  const v = $("vid");
+  v.src = "videos/" + CONFIG.VIDEOS[id];
+  v.load();
+  v.play().catch(()=>{});   // 自動再生できない端末では再生ボタンを押してもらう
+}
+$("vid").addEventListener("ended", () => {
+  if (!watched){ watched = true; $("qs").disabled = false; $("watch-note").hidden = true; updateNext(); }
+});
+$("qform").addEventListener("change", updateNext);
+$("b-next").addEventListener("click", () => {
+  const a = answers();
+  send({type:"answer", sid, order: idx + 1, video_id: playlist[idx], ...a});
+  idx++;
+  if (idx < playlist.length){ loadVideo(); }
+  else { $("vid").removeAttribute("src"); $("vid").load(); show("s-done"); }
+});
+</script>
+</body>
+</html>
