@@ -266,7 +266,7 @@ $("b-next").addEventListener("click", () => {
   const a = answers();
   send({type:"answer", sid, order: idx + 1, video_id: playlist[idx], ...a});
   idx++;
-  if (idx < playlist.length){ loadVideo(); }
+  if (idx < playlist.length){ loadVideo(); window.scrollTo({top: 0, behavior: "smooth"}); }
   else { $("vid").removeAttribute("src"); $("vid").load(); show("s-done"); }
 });
 </script>
