@@ -132,7 +132,7 @@ const Q = {
   onset:      {key:"onset",  label:"ロボットが避け始めたタイミング", type:"choice", opts:["早め","直前"]},
   robot_act:   {key:"robot_act",   label:"男性と出会う前(角に着くまで)のロボットの動き", type:"choice", opts:["そのまま進んだ","大回りした","減速した","一時停止した"]},
   robot_after: {key:"robot_after", label:"男性と出会ったあとのロボットの動き", type:"choice", opts:["譲らずに進んだ","止まった","大きくよけた"]},
-  human_after: {key:"human_after", label:"出会ったあとの男性の動き", type:"choice", opts:["一歩下がってよけた","ロボットを回り込んだ","まっすぐ通り過ぎた"]}
+  human_after: {key:"human_after", label:"出会ったあとの男性の進み方(途中で立ち止まったかどうかは問いません)", type:"choice", opts:["一歩下がってよけた","ロボットを回り込んだ","進路を変えずに通り過ぎた"]}
 };
 // 駅前広場(SQ)は距離・速度・避け始めを、曲がり角(CN)はロボットの動きと人の反応を確かめる
 function questionsFor(id){
